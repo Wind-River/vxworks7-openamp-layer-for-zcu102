@@ -1,0 +1,1406 @@
+diff -uparN open-amp-2016.10/lib/common/Makefile openamp/lib/common/Makefile
+--- open-amp-2016.10/lib/common/Makefile	2019-06-22 21:35:13.039001000 -0400
++++ openamp/lib/common/Makefile	2019-06-22 21:35:13.099001000 -0400
+@@ -1,6 +1,6 @@
+ # Makefile - makefile for OpenAMP common
+ #
+-# Copyright (c) 2016 Wind River Systems, Inc. 
++# Copyright (c) 2016, 2019 Wind River Systems, Inc. 
+ # 
+ # Redistribution and use in source and binary forms, with or without modification, are 
+ # permitted provided that the following conditions are met: 
+@@ -29,6 +29,7 @@
+ #
+ # modification history
+ # --------------------
++# 10jun19,drp  Added support for Xilinx zcu102
+ # 10nov16,ghl  Create for OpenAMP on vxworks-7 (F8373).
+ #
+ # DESCRIPTION
+@@ -39,8 +40,25 @@ LIB_BASE_NAME = OPENAMP
+ 
+ include $(WIND_KRNL_MK)/defs.library.mk
+ 
++
++
++ifdef   _WRS_CONFIG_FSL_IMX
++OBJS_ARMARCH7M = firmware.o hil.o sh_mem.o
++OBJS_ARMARCH7  = firmware.o hil.o sh_mem.o
++endif
++
++ifdef   _WRS_CONFIG_TI_SITARA
+ OBJS_ARMARCH7M = firmware.o hil.o sh_mem.o
+ OBJS_ARMARCH7  = firmware.o hil.o sh_mem.o
++endif
++
++ifdef   _WRS_CONFIG_XLNX_ZYNQ
++OBJS_ARMARCH7 = firmware.o hil.o sh_mem.o
++OBJS_ARMARCH8A  = firmware.o hil.o sh_mem.o
++endif
++
++
++
+ DOC_FILES      = firmware.c hil.c sh_mem.c
+ 
+ include $(wildcard $(sort *.mk))
+diff -uparN open-amp-2016.10/lib/include/openamp/elf_loader.h openamp/lib/include/openamp/elf_loader.h
+--- open-amp-2016.10/lib/include/openamp/elf_loader.h	2016-11-04 12:18:46.000000000 -0400
++++ openamp/lib/include/openamp/elf_loader.h	2019-06-22 21:35:13.099001000 -0400
+@@ -33,7 +33,11 @@
+ #include "openamp/remoteproc_loader.h"
+ 
+ /* ELF base types - 32-bit. */
++#if 0
+ typedef uintptr_t Elf32_Addr;
++#else
++typedef unsigned int Elf32_Addr;
++#endif
+ typedef unsigned short Elf32_Half;
+ typedef unsigned int Elf32_Off;
+ typedef signed int Elf32_Sword;
+diff -uparN open-amp-2016.10/lib/include/openamp/firmware.h openamp/lib/include/openamp/firmware.h
+--- open-amp-2016.10/lib/include/openamp/firmware.h	2016-11-04 12:18:46.000000000 -0400
++++ openamp/lib/include/openamp/firmware.h	2019-06-22 21:35:13.099001000 -0400
+@@ -38,11 +38,16 @@
+ 
+ struct firmware_info {
+ 	char name[32];
+-	unsigned int start_addr;
+-	unsigned int end_addr;
++	void *start_addr;
++	void *end_addr;
+ };
+ 
++#if 1
+ int config_get_firmware(char *fw_name, uintptr_t *start_addr,
+ 			unsigned int *size);
++#else
++int config_get_firmware(char *fw_name, void* *start_addr,
++			unsigned int *size);
++#endif
+ 
+ #endif
+diff -uparN open-amp-2016.10/lib/proxy/Makefile openamp/lib/proxy/Makefile
+--- open-amp-2016.10/lib/proxy/Makefile	2019-06-22 21:35:13.043001000 -0400
++++ openamp/lib/proxy/Makefile	2019-06-22 21:35:13.099001000 -0400
+@@ -29,6 +29,7 @@
+ #
+ # modification history
+ # --------------------
++# 14jun19,drp  Added support for Xilinx zcu102
+ # 10nov16,ghl  Create for OpenAMP on vxworks-7 (F8373).
+ #
+ # DESCRIPTION
+@@ -39,8 +40,22 @@ LIB_BASE_NAME = OPENAMP
+ 
+ include $(WIND_KRNL_MK)/defs.library.mk
+ 
++ifdef   _WRS_CONFIG_FSL_IMX
+ OBJS_ARMARCH7M = rpmsg_retarget.o
+ OBJS_ARMARCH7  = rpmsg_retarget.o
++endif
++
++ifdef   _WRS_CONFIG_TI_SITARA
++OBJS_ARMARCH7M = rpmsg_retarget.o
++OBJS_ARMARCH7  = rpmsg_retarget.o
++endif
++
++ifdef   _WRS_CONFIG_XLNX_ZYNQ
++OBJS_ARMARCH7 = rpmsg_retarget.o
++OBJS_ARMARCH8A  = rpmsg_retarget.o
++endif
++
++
+ DOC_FILES      = 
+ 
+ include $(wildcard $(sort *.mk))
+diff -uparN open-amp-2016.10/lib/remoteproc/drivers/imx6sx/Makefile openamp/lib/remoteproc/drivers/imx6sx/Makefile
+--- open-amp-2016.10/lib/remoteproc/drivers/imx6sx/Makefile	2019-06-22 21:35:13.043001000 -0400
++++ openamp/lib/remoteproc/drivers/imx6sx/Makefile	2019-06-22 21:35:13.099001000 -0400
+@@ -40,8 +40,13 @@ LIB_BASE_NAME = OPENAMP
+ 
+ include $(WIND_KRNL_MK)/defs.library.mk
+ 
++ifdef _WRS_CONFIG_FSL_IMX
+ OBJS_ARMARCH7M = imx6sx_cm4_info.o imx6sx_cm4.o helper.o
+ OBJS_ARMARCH7  = imx6sx_ca9_info.o imx6sx_ca9.o helper.o
++else
++OBJS_ARMARCH7M
++OBJS_ARMARCH7
++endif
+ 
+ include $(wildcard $(sort *.mk))
+ 
+diff -uparN open-amp-2016.10/lib/remoteproc/drivers/Makefile openamp/lib/remoteproc/drivers/Makefile
+--- open-amp-2016.10/lib/remoteproc/drivers/Makefile	2019-06-22 21:35:13.043001000 -0400
++++ openamp/lib/remoteproc/drivers/Makefile	2019-06-22 21:35:13.099001000 -0400
+@@ -1,6 +1,6 @@
+ # Makefile - makefile for platform remoteproc driver
+ #
+-# Copyright (c) 2015-2016 Wind River Systems, Inc. 
++# Copyright (c) 2015-2016, 2019 Wind River Systems, Inc. 
+ # 
+ # Redistribution and use in source and binary forms, with or without modification, are 
+ # permitted provided that the following conditions are met: 
+@@ -29,6 +29,7 @@
+ #
+ # modification history
+ # --------------------
++# 14jun19,drp  Added support for Xilinx zcu102
+ #
+ #
+ # DESCRIPTION
+@@ -38,15 +39,21 @@
+ LIB_BASE_NAME = OPENAMP
+ include $(WIND_KRNL_MK)/defs.library.mk
+ 
+-ifdef	_WRS_CONFIG_FSL_IMX
++ifdef   _WRS_CONFIG_FSL_IMX
+ SUBDIRS = imx6sx
+ endif
+-ifdef	_WRS_CONFIG_TI_SITARA
++
++ifdef   _WRS_CONFIG_TI_SITARA
+ SUBDIRS = sitara
+ endif
+ 
++ifdef   _WRS_CONFIG_XLNX_ZYNQ
++SUBDIRS = zynqmp
++endif
++
+ OBJS_ARMARCH7M = 
+ OBJS_ARMARCH7 = 
++OBJS_ARMARCH8A = 
+ 
+ include $(wildcard $(sort *.mk))
+ 
+diff -uparN open-amp-2016.10/lib/remoteproc/drivers/sitara/Makefile openamp/lib/remoteproc/drivers/sitara/Makefile
+--- open-amp-2016.10/lib/remoteproc/drivers/sitara/Makefile	2019-06-22 21:35:13.043001000 -0400
++++ openamp/lib/remoteproc/drivers/sitara/Makefile	2019-06-22 21:35:13.099001000 -0400
+@@ -40,8 +40,13 @@ LIB_BASE_NAME = OPENAMP
+ 
+ include $(WIND_KRNL_MK)/defs.library.mk
+ 
++ifdef   _WRS_CONFIG_TI_SITARA
+ OBJS_ARMARCH7M = sitara_cm4_info.o sitara_cm4.o helper.o
+ OBJS_ARMARCH7  = sitara_ca15_info.o sitara_ca15.o helper.o
++else
++OBJS_ARMARCH7M
++OBJS_ARMARCH7
++endif
+ 
+ include $(wildcard $(sort *.mk))
+ 
+diff -uparN open-amp-2016.10/lib/remoteproc/drivers/zynqmp/helper.c openamp/lib/remoteproc/drivers/zynqmp/helper.c
+--- open-amp-2016.10/lib/remoteproc/drivers/zynqmp/helper.c	1969-12-31 19:00:00.000000000 -0500
++++ openamp/lib/remoteproc/drivers/zynqmp/helper.c	2019-06-22 21:35:13.099001000 -0400
+@@ -0,0 +1,114 @@
++
++/*
++ * Copyright (c) 2014, Mentor Graphics Corporation
++ * All rights reserved.
++ *
++ * Copyright (c) 2015 Xilinx, Inc. All rights reserved.
++ * Copyright (c) 2017, 2019 Wind River System, Inc. All rights reserved.
++ * 
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ * 3. Neither the name of the <ORGANIZATION> nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include <vxWorks.h>
++#include <pmapLib.h>
++#include <string.h>
++#include <stdio.h>
++#include "metal/sys.h"
++#include "metal/shmem.h"
++#include "metal/device.h"
++#include "metal/io.h"
++#include "openamp/firmware.h"
++
++extern struct metal_generic_shmem metal_shm_table[];
++extern int metal_shm_table_size;
++
++extern struct firmware_info fw_table[];
++extern int fw_table_size;
++
++extern void *metal_machine_io_mem_map(metal_phys_addr_t pa,
++				      size_t size, unsigned int flags);
++extern int metal_init_fw_info(struct firmware_info * fw_info);
++
++void cleanup_system()
++{
++    int i;
++    struct firmware_info *fw_info;
++
++    for (i = 0; i < fw_table_size; i++)
++    {
++        fw_info = &fw_table[i];
++        if (fw_info->start_addr)
++        {
++            free((void *)fw_info->start_addr);
++            fw_info->start_addr = 0;
++        }
++    }
++
++    metal_finish();
++}
++
++int init_system()
++{
++    struct metal_init_params metal_param = METAL_INIT_DEFAULTS;
++    struct metal_generic_shmem *sh_mem;
++    struct firmware_info *fw_info;
++    int i;
++    
++    metal_param.log_level = LOG_DEBUG;
++    metal_init(&metal_param);
++
++    for (i = 0; i < metal_shm_table_size; i++)
++    {
++        sh_mem = &metal_shm_table[i];
++        sh_mem->io.virt = metal_machine_io_mem_map(sh_mem->io.physmap[0], 
++                                 sh_mem->io.size, sh_mem->io.mem_flags);
++        if (sh_mem->io.virt == PMAP_FAILED)
++        {
++            goto error_out;
++        }
++        metal_shmem_register_generic(sh_mem);
++    }
++
++    for (i = 0; i < fw_table_size; i++)
++    {
++        fw_info = &fw_table[i];
++        if (strncmp(fw_info->name, "", sizeof(fw_info->name)) == 0)
++        {
++            continue;
++        }
++        
++        if (metal_init_fw_info(fw_info) != 0)
++        {
++            goto error_out;
++        }
++    }
++    return 0;
++
++error_out:
++    cleanup_system();
++    
++    return -1;
++}
++
+diff -uparN open-amp-2016.10/lib/remoteproc/drivers/zynqmp/Makefile openamp/lib/remoteproc/drivers/zynqmp/Makefile
+--- open-amp-2016.10/lib/remoteproc/drivers/zynqmp/Makefile	1969-12-31 19:00:00.000000000 -0500
++++ openamp/lib/remoteproc/drivers/zynqmp/Makefile	2019-06-22 21:35:13.099001000 -0400
+@@ -0,0 +1,50 @@
++# Makefile - makefile for VxWorks OpenAMP support library
++#
++# Copyright (c) 2016, 2019 Wind River Systems, Inc. 
++# 
++# Redistribution and use in source and binary forms, with or without modification, are 
++# permitted provided that the following conditions are met: 
++# 
++# 1) Redistributions of source code must retain the above copyright notice, 
++# this list of conditions and the following disclaimer. 
++# 
++# 2) Redistributions in binary form must reproduce the above copyright notice, 
++# this list of conditions and the following disclaimer in the documentation and/or 
++# other materials provided with the distribution. 
++# 
++# 3) Neither the name of Wind River Systems nor the names of its contributors may be 
++# used to endorse or promote products derived from this software without specific 
++# prior written permission. 
++# 
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
++# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
++# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
++# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE 
++# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
++# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR 
++# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER 
++# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
++# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE 
++# USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
++#
++# modification history
++# --------------------
++# 14jun19,drp  Created
++#
++# DESCRIPTION
++# This file contains the makefile rules for building TI AM532x processor
++# support library.
++#
++
++LIB_BASE_NAME = OPENAMP
++
++include $(WIND_KRNL_MK)/defs.library.mk
++
++OBJS_ARMARCH7 = zynqmp_r5_info.o zynqmp_r5.o helper.o
++OBJS_ARMARCH8A  = zynqmp_a53_info.o zynqmp_a53.o helper.o
++
++include $(wildcard $(sort *.mk))
++
++OBJS=$(OBJS_$(CPU))
++
++include $(WIND_KRNL_MK)/rules.library.mk
+diff -uparN open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_a53.c openamp/lib/remoteproc/drivers/zynqmp/zynqmp_a53.c
+--- open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_a53.c	1969-12-31 19:00:00.000000000 -0500
++++ openamp/lib/remoteproc/drivers/zynqmp/zynqmp_a53.c	2019-06-22 21:35:13.099001000 -0400
+@@ -0,0 +1,450 @@
++/*
++ * Copyright (c) 2014, Mentor Graphics Corporation
++ * All rights reserved.
++ * Copyright (c) 2016, 2019 Wind River Systems, Inc. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ * 3. Neither the name of Mentor Graphics Corporation nor the names of its
++ *    contributors may be used to endorse or promote products derived from this
++ *    software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
++
++/**************************************************************************
++ * FILE NAME
++ *
++ *       zynqmp_a53.c
++ *
++ * DESCRIPTION
++ *
++ *       This file is the Implementation of IPC hardware layer interface
++ *       for the Xilinx zcu102 platform.
++ *
++ **************************************************************************/
++
++#include <vxWorks.h>
++#include <pmapLib.h>
++#include <vmLibCommon.h>
++#include <vxAtomicLib.h>
++#include "metal/atomic.h" 
++#include "metal/irq.h"
++#include "metal/sys.h"
++#include "openamp/hil.h"
++#include "openamp/elf_loader.h"
++#include "openamp/open_amp_vx.h"
++
++char * openampRole = "master";
++#define TEMP_SP_BASE         (0x0fff0000)
++
++#define RPU_BASE_ADDR    (0xFF9A0000)
++#define RPU_SIZE         (0x400)  /* big enough */
++#define RPU_GLB_CTRL_OFFSET    (0)
++#define RPU_RPU0_CFG_OFFSET      (0x100)
++
++#define R5_0_ATCM_ADDR       (0xffe00000)
++#define R5_0_ATCM_HIVEC_ADDR (0xfff00000)
++#define R5_0_ACTM_HIVECT_OFFSET (R5_0_ATCM_HIVEC_ADDR-R5_0_ATCM_ADDR)
++#define TCM_SIZE      (0x10000) 
++#define CM4_SRC_ENABLE       (0xa0480529)
++#define CM4_SRC_BASE_PHYS    (0x020d8000)
++#define CM4_SRC_SIZE         (0x4000)
++
++#define CRL_APB_CPU_R5_CTRL_CLKACT_MASK	0x1000000
++#define RPU_CFG_CPU_HALT_MASK            0x01
++#define RPU_GLBL_CTRL_SPLIT_LOCK_MASK    0x08
++#define RPU_GLBL_CTRL_TCM_COMB_MASK      0x40
++#define RPU_GLBL_CTRL_SLCLAMP_MASK       0x10
++
++#define RPU_CFG_HIVEC_MASK               0x04
++
++
++#define noload
++#undef noload 
++
++
++/* LPD clock and reset control */
++#define CRL_APB_BASE_ADDR (0xff5e0000)
++#define CRL_APB_SIZE (0x3c0000)
++#define CRL_APB_CPU_R5_CTRL_OFFSET 0x90
++#define CRL_APB_RST_LPD_TOP_OFFSET 0x23C
++#define CRL_APB_RST_LPD_AMBA_RST_MASK     0x04
++#define CRL_APB_RST_LPD_R50_RST_MASK      0x01
++
++#define DBG_REG_SHOW
++
++#define REG(vaddr,offset)     (*(UINT32 *)((UINT32)(vaddr)+(offset)))    
++
++#define _rproc_wait() taskDelay(0)
++
++extern void vxbMsDelay(int delayTime);
++
++/*--------------------------- Declare Functions ------------------------ */
++static int _enable_interrupt(struct proc_vring *vring_hw);
++static void _notify(struct hil_proc *proc, struct proc_intr *intr_info);
++static int _boot_cpu(struct hil_proc *proc, unsigned int load_addr);
++static void _shutdown_cpu(struct hil_proc *proc);
++static int _poll(struct hil_proc *proc, int nonblock);
++static int _initialize(struct hil_proc *proc);
++static void _release(struct hil_proc *proc);
++
++static int platform_isr(int vect_id, void *data);
++static int boot_remote_cpu(UINT32 entry, UINT32 cpu);
++
++/*--------------------------- Globals ---------------------------------- */
++struct hil_platform_ops zynqmp_a53_proc_ops = {
++    .enable_interrupt	= _enable_interrupt,
++    .notify				= _notify,
++    .boot_cpu			= _boot_cpu,
++    .shutdown_cpu 		= _shutdown_cpu,
++    .poll               = _poll,
++    .initialize         = _initialize,
++    .release            = _release,
++};
++
++static int _enable_interrupt(struct proc_vring *vring_hw)
++{
++    OPEN_AMP_DBG(3, "vect_id=%d,vring_hw=%p,isr=%p\n", 
++                    vring_hw->intr_info.vect_id, vring_hw, platform_isr);
++    /* Register ISR*/
++    metal_irq_register(vring_hw->intr_info.vect_id, platform_isr,
++                    vring_hw->intr_info.dev, vring_hw);
++
++    /* Enable the interrupts */
++    metal_irq_enable(vring_hw->intr_info.vect_id);
++    return 0;
++}
++
++static void _notify(struct hil_proc *proc, struct proc_intr *intr_info)
++{
++    OPEN_AMP_DBG(3, "cpu_id=%d,intr_info=%p\n", proc->cpu_id, intr_info);
++    if (vx_openamp_ipi_notify)
++        vx_openamp_ipi_notify(intr_info->vect_id);
++}
++
++static int _boot_cpu(struct hil_proc *proc, unsigned int load_addr)
++{
++    OPEN_AMP_DBG(3, "cpu_id=%d,load_addr=0x%x\n", proc->cpu_id, load_addr);
++    boot_remote_cpu(load_addr, proc->cpu_id);
++    return 0;
++}
++
++
++static void _shutdown_cpu(struct hil_proc *proc)
++{
++    OPEN_AMP_DBG(3, "cpu_id=%d\n", proc->cpu_id);
++    /* temp: do nothing here */
++}
++
++static int platform_isr(int vect_id, void *data)
++{
++    struct proc_vring *vring_hw = (struct proc_vring *)(data);
++    struct proc_intr *intr_info;
++
++    (void) vect_id;
++    
++    intr_info = &(vring_hw->intr_info);
++    atomic_flag_clear((atomic_uint *)&(intr_info->data));
++
++    OPEN_AMP_DBG(3, "vector=%d,data=%p\n", vect_id, data);
++
++    return 0;
++}
++
++static int _poll(struct hil_proc * proc,int nonblock)
++{
++    struct proc_vring *vring;
++    struct proc_intr *intr_info;
++    int i = 0;
++    int kicked = 0;
++
++    while(1) {
++        vring = &proc->vdev.vring_info[i];
++        intr_info = &(vring->intr_info);
++        if (!(atomic_flag_test_and_set(
++            (atomic_uint *)&(intr_info->data)))) {
++#if 0
++         kprintf(">>poll vring[%d]=%p %p=0x%x\n",i,  vring, &(intr_info->data), intr_info->data); 
++             kprintf("calling virtqueue_notification(vring->vq=%p)\n", vring->vq);
++#endif
++            virtqueue_notification(vring->vq);
++            kicked = 1;
++            if (i)
++                return 0;
++            i++;
++        } else if (!i) {
++            i++;
++        } else {
++            if (kicked) {
++                return 0;
++            } else if (nonblock) {
++                return -EAGAIN;
++            } else {
++                _rproc_wait();
++                i--;
++                continue;
++            }
++        }
++    }
++}
++
++static int _initialize(struct hil_proc * proc)
++{
++    int i;
++    struct proc_intr *intr_info;
++
++    for (i = 0; i < 2; i++) {
++        intr_info = &(proc->vdev.vring_info[i].intr_info);
++        atomic_store((atomic_uint *)&(intr_info->data), 1);
++    }
++
++    return 0;    
++}
++
++static void _release(struct hil_proc * proc)
++{
++    (void)proc;
++    return;
++}
++
++
++static int boot_remote_cpu
++    (
++    UINT32 entry,   /* Entry point */
++    UINT32 cpu	    /* CPU number */ 
++    )
++{
++    STATUS stat = OK;
++    UINT32 *vect;
++    volatile UINT32 tmp;
++    UINT32 *rst_lpd_top;
++    UINT32 *rpu_glb_ctrl;
++    UINT32 *rpu0_cfg;
++    UINT32 *cpu_r5_ctrl;
++    UINT32 *trampoline;
++     
++    OPEN_AMP_DBG(2,"cpu=%d, entry=0x%x\n", cpu, entry);
++
++/* ------------------------------------------------------------------------------ */
++   /* map in the LPD clock and reset control */
++    UINT32 *crl_apb_vaddr = (UINT32 *)pmapGlobalMap(CRL_APB_BASE_ADDR, 
++                                               CRL_APB_SIZE, 
++                                               MMU_ATTR_CACHE_OFF);
++    if ((void*)crl_apb_vaddr == PMAP_FAILED){
++        OPEN_AMP_DBG(2, "Failed to map 0x%08x, 0x%08x\n", 
++                        CRL_APB_BASE_ADDR, CRL_APB_SIZE);
++        return (ERROR);
++    }
++
++    OPEN_AMP_DBG(2,"Mapped in LPD clock and reset:  physical=0x%x virtual=0x%llx size=0x%x\n", CRL_APB_BASE_ADDR, crl_apb_vaddr, CRL_APB_SIZE);
++/* ------------------------------------------------------------------------------ */
++   /* map in the RPU regisers */
++    UINT32 *rpu_vaddr = (UINT32 *)pmapGlobalMap(RPU_BASE_ADDR, 
++                                               RPU_SIZE, 
++                                               MMU_ATTR_CACHE_OFF);
++    if ((void*)rpu_vaddr == PMAP_FAILED){
++        OPEN_AMP_DBG(2, "Failed to map 0x%08x, 0x%08x\n", 
++                        RPU_BASE_ADDR, RPU_SIZE);
++        return (ERROR);
++    }
++    OPEN_AMP_DBG(2,"Mapped in RPU Registers:  physical=0x%x virtual=0x%llx size=0x%x\n", RPU_BASE_ADDR, rpu_vaddr, RPU_SIZE);
++
++/* ------------------------------------------------------------------------------ */
++   /* map in R5 CPU 0 ATCM */
++    UINT32 *r5_0_atcm_vaddr = (UINT32 *)pmapGlobalMap(R5_0_ATCM_ADDR, 
++                                               TCM_SIZE, 
++                                               MMU_ATTR_CACHE_OFF);
++   /* map in R5 CPU 0 ATCM */
++    if ((void*)r5_0_atcm_vaddr == PMAP_FAILED){
++        OPEN_AMP_DBG(2, "Failed to map 0x%08x, 0x%08x\n", 
++                        R5_0_ATCM_ADDR, TCM_SIZE);
++        return (ERROR);
++    }
++    OPEN_AMP_DBG(2,"Mapped in R5 CPU 0 ATCM:  physical=0x%x virtual=0x%llx size=0x%x\n", R5_0_ATCM_ADDR, r5_0_atcm_vaddr, TCM_SIZE);
++
++#if 0
++                flush_dcache_all();
++#endif
++
++/* ------------------------------------------------------------------------------ */
++/* hold the R5 in reset (split mode) */
++        rst_lpd_top = (UINT32*) ((char*)crl_apb_vaddr + CRL_APB_RST_LPD_TOP_OFFSET);
++        tmp = *rst_lpd_top;
++        tmp |= (CRL_APB_RST_LPD_AMBA_RST_MASK |
++               CRL_APB_RST_LPD_R50_RST_MASK);
++        OPEN_AMP_DBG(2,"Holding R5 in reset (split mode) by writing 0x%x to virtual address 0x%llx\n", tmp, rst_lpd_top);
++#ifndef noload 
++        *rst_lpd_top = tmp;
++#endif
++
++
++/* ------------------------------------------------------------------------------ */
++/* set TCM split mode */
++       rpu_glb_ctrl = (UINT32*) ((char*)rpu_vaddr + RPU_GLB_CTRL_OFFSET);
++       tmp = *rpu_glb_ctrl;
++       tmp |= RPU_GLBL_CTRL_SPLIT_LOCK_MASK;
++       tmp &= ~(RPU_GLBL_CTRL_TCM_COMB_MASK |
++                       RPU_GLBL_CTRL_SLCLAMP_MASK);
++        OPEN_AMP_DBG(2,"Set TCM split mode by writing 0x%x to virtual address 0x%llx\n", tmp, rpu_glb_ctrl);
++#ifndef noload
++       *rpu_glb_ctrl = tmp;
++#endif
++
++
++/* ------------------------------------------------------------------------------ */
++/* set halt and vector */
++        rpu0_cfg = (UINT32*) ((char*)rpu_vaddr + RPU_RPU0_CFG_OFFSET);
++        tmp = *rpu0_cfg;
++        tmp &= ~RPU_CFG_CPU_HALT_MASK;
++        tmp &= ~RPU_CFG_HIVEC_MASK;
++        OPEN_AMP_DBG(2,"Setting halt and vector by writing 0x%x to virtual address 0x%llx\n", tmp, rpu0_cfg);
++#ifndef noload
++        *rpu0_cfg = tmp;
++#endif
++
++#if 0
++/* ------------------------------------------------------------------------------ */
++/* Enable clock */
++   	cpu_r5_ctrl = (UINT32*)((char*)crl_apb_vaddr + CRL_APB_CPU_R5_CTRL_OFFSET);
++   	tmp = *cpu_r5_ctrl;
++   	tmp |= CRL_APB_CPU_R5_CTRL_CLKACT_MASK;
++        OPEN_AMP_DBG(2,"Enabling clock by writing 0x%x to virtual address 0x%llx\n", tmp, cpu_r5_ctrl);
++#ifndef noload
++   	*cpu_r5_ctrl = tmp;
++#endif
++   	vxbMsDelay(500);
++#endif
++/* ------------------------------------------------------------------------------ */
++/* release the R5 reset (split mode) */
++        tmp = *rst_lpd_top;
++        tmp &= ~(CRL_APB_RST_LPD_AMBA_RST_MASK |
++               CRL_APB_RST_LPD_R50_RST_MASK);
++
++        OPEN_AMP_DBG(2, "Releasing the R5 reset (split mode) by writing 0x%x to virtual address 0x%llx\n", tmp, rst_lpd_top);
++#ifndef noload
++        *rst_lpd_top = tmp;
++#endif
++
++#if 0
++                        dcache_disable();
++#endif
++
++/* ------------------------------------------------------------------------------ */
++/* write the tboot trampoline  */
++  /*
++                 *
++                 *              b over;
++                 *      label:
++                 *      .word   0
++                 *      over:   ldr     r0, =label
++                 *              ldr     r1, [r0]
++                 *              bx      r1
++                 */
++ 	 trampoline = r5_0_atcm_vaddr;  /* get virtual address of HIVEC */
++        OPEN_AMP_DBG(2, "Writing the trampoline code with physical start address 0x%x to virtual address 0x%llx\n", entry, r5_0_atcm_vaddr);
++#ifndef noload 
++  	trampoline[0] = 0xea000000;
++  	trampoline[1] = entry;
++  	trampoline[2] = 0xe59f0004;
++  	trampoline[3] = 0xe5901000;
++  	trampoline[4] = 0xe12fff11; 
++  	trampoline[5] = 0x00000004;
++#endif
++
++#if 0
++                        dcache_enable();
++#endif
++
++vxbMsDelay(500);
++
++/* ------------------------------------------------------------------------------ */
++/* set release halt  */
++        tmp = *rpu0_cfg;
++        tmp |= RPU_CFG_CPU_HALT_MASK;
++        OPEN_AMP_DBG(2,"Releasing R5 by writing 0x%x to virtual address 0x%llx\n", tmp, rpu0_cfg);
++#ifndef noload
++        *rpu0_cfg = tmp;
++#endif
++
++#if 1
++    stat = pmapGlobalUnmap(r5_0_atcm_vaddr, TCM_SIZE);
++    if (stat != OK)
++    {
++        OPEN_AMP_DBG(2, "Failed to unmap 0x%08x, 0x%08x\n", 
++                        r5_0_atcm_vaddr, TCM_SIZE);
++        return (ERROR);
++    }
++         
++    stat = pmapGlobalUnmap(rpu_vaddr, RPU_SIZE);
++    if (stat != OK)
++    {
++        OPEN_AMP_DBG(2, "Failed to unmap 0x%08x, 0x%08x\n", 
++                        rpu_vaddr, RPU_SIZE);
++        return (ERROR);
++    }
++    stat = pmapGlobalUnmap(crl_apb_vaddr, CRL_APB_SIZE);
++    if (stat != OK)
++    {
++        OPEN_AMP_DBG(2, "Failed to unmap 0x%08x, 0x%08x\n", 
++                        crl_apb_vaddr, CRL_APB_SIZE);
++        return (ERROR);
++    }
++#endif
++    return (OK);
++}
++
++int metal_machine_load_remote(void *fw, void *destination,
++				    Elf32_Off offset, Elf32_Word size)
++{
++    void *vaddr;
++    char *src = (char *)fw;
++    UINT32 paddr = (UINT32)destination;
++
++    vaddr = pmapGlobalMap(paddr, size, 
++                          (MMU_ATTR_CACHE_WRITETHRU |
++                           MMU_ATTR_CACHE_COHERENCY));
++
++    if (vaddr == PMAP_FAILED)
++    {
++        return -1;
++    }
++    OPEN_AMP_DBG(2, "destination=%p,paddr=%x,vaddr=%p,sh_offset=%d,sh_size=%d\n", 
++                    destination, paddr, vaddr, offset, size);
++    /* Seek to the specified offset. */
++    src = src + offset;
++
++#ifdef noload
++    kprintf("skipping the memcopy\n");
++#else
++    /* Read the data. */
++    memcpy((char *)vaddr, src, size);
++#endif
++    pmapGlobalUnmap(vaddr, size); 
++    
++    return 0;
++}
++
++void * metal_machine_io_mem_map(unsigned int pa, unsigned int size, unsigned int flags)
++{
++    (void)flags;
++
++    return pmapGlobalMap(pa, size, MMU_ATTR_CACHE_OFF);
++}
++
+diff -uparN open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_a53_info.c openamp/lib/remoteproc/drivers/zynqmp/zynqmp_a53_info.c
+--- open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_a53_info.c	1969-12-31 19:00:00.000000000 -0500
++++ openamp/lib/remoteproc/drivers/zynqmp/zynqmp_a53_info.c	2019-06-22 21:35:13.099001000 -0400
+@@ -0,0 +1,142 @@
++/*
++ * Copyright (c) 2014, Mentor Graphics Corporation
++ * All rights reserved.
++ * Copyright (c) 2016, 2019 Wind River Systems, Inc. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ * 3. Neither the name of Mentor Graphics Corporation nor the names of its
++ *    contributors may be used to endorse or promote products derived from this
++ *    software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
++
++/**************************************************************************
++ * FILE NAME
++ *
++ *       zynqmp_a53_info.c
++ *
++ * DESCRIPTION
++ *
++ *       This file implements APIs to get platform specific
++ *       information for OpenAMP. 
++ *
++ **************************************************************************/
++
++#include "openamp/hil.h"
++#include "metal/sys.h"
++#include "metal/shmem.h"
++#include "metal/device.h"
++#include "metal/io.h"
++
++/* Reference implementation that show cases platform_get_cpu_info and 
++ platform_get_for_firmware API implementation for Bare metal environment */
++
++extern struct hil_platform_ops zynqmp_a53_proc_ops;
++
++
++
++
++#define SHM_ADDR     (void *)(0x77f80000) 
++#define SHM_SIZE     (0x20000 - 0x8000)
++
++#define VRING0_IPI_VECT                   0
++#define VRING1_IPI_VECT                   1
++#define VRING2_IPI_VECT                   2
++#define VRING3_IPI_VECT                   3
++#define MASTER_CPU_ID                     0
++#define REMOTE_CPU_ID                     0
++#define RPMSG_CHAN_NAME                   "rpmsg-openamp-demo-channel"
++
++const metal_phys_addr_t metal_xlnx_zynqmp_phys[] = {
++    0x77f00000, /**< base vring address */
++    0x77f08000, /**< Shared memory management device */
++};
++#define SHM_DEV_NAME           "77f08000.shm"
++#define VRING_DEV_NAME         "77f00000.vring"
++
++struct metal_generic_shmem metal_shm_table[] = {
++    {
++        /* vring device */
++        VRING_DEV_NAME,
++        {
++            (void *)-1,             /* not need to tranfer for local mem address */
++            &metal_xlnx_zynqmp_phys[0],  /* from RING_TX and RING_RX in rsc_table.c */
++            0x8000,
++            (sizeof(metal_phys_addr_t) << 3),
++            (unsigned long)(-1),
++            METAL_UNCACHED | METAL_SHARED_MEM,
++            {NULL},
++        },
++        {NULL},
++    },
++    {
++        /* Shared memory management device */
++        SHM_DEV_NAME,
++        {
++            (void *)-1,
++            &metal_xlnx_zynqmp_phys[1],
++            0x18000,
++            (sizeof(metal_phys_addr_t) << 3),
++            (unsigned long)(-1),
++            METAL_UNCACHED | METAL_SHARED_MEM,
++            {NULL},
++        },
++        {NULL},
++    },
++};
++
++const int metal_shm_table_size = sizeof(metal_shm_table)/sizeof(struct metal_generic_shmem);
++
++struct firmware_info fw_table[] =
++{
++    {"/romfs/vxWorks",
++     0,
++     0}
++};
++
++const int fw_table_size = sizeof(fw_table)/sizeof(struct firmware_info);
++
++struct hil_proc *platform_create_proc(int proc_index)
++{
++    struct hil_proc *proc;
++
++    (void)proc_index;
++    proc = hil_create_proc(&zynqmp_a53_proc_ops, REMOTE_CPU_ID, NULL);
++    if (!proc)
++    	return NULL;
++
++    /* Setup IPI info */
++    hil_set_ipi(proc, 0, VRING0_IPI_VECT, NULL);
++    hil_set_ipi(proc, 1, VRING1_IPI_VECT, NULL);
++
++    hil_set_vring(proc, 0, NULL, VRING_DEV_NAME);
++    hil_set_vring(proc, 1, NULL, VRING_DEV_NAME);
++
++    /* Setup shared memory info */
++    hil_set_shm(proc, NULL, SHM_DEV_NAME, 0, SHM_SIZE);
++
++    /* Setup RPMSG channel info */
++    hil_set_rpmsg_channel(proc, 0, RPMSG_CHAN_NAME);
++
++    return proc;
++}
++
++
+diff -uparN open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_r5.c openamp/lib/remoteproc/drivers/zynqmp/zynqmp_r5.c
+--- open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_r5.c	1969-12-31 19:00:00.000000000 -0500
++++ openamp/lib/remoteproc/drivers/zynqmp/zynqmp_r5.c	2019-06-22 21:35:13.099001000 -0400
+@@ -0,0 +1,202 @@
++/*
++ * Copyright (c) 2014, Mentor Graphics Corporation
++ * All rights reserved.
++ * Copyright (c) 2016, 2019 Wind River Systems, Inc. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ * 3. Neither the name of Mentor Graphics Corporation nor the names of its
++ *    contributors may be used to endorse or promote products derived from this
++ *    software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
++
++/**************************************************************************
++ * FILE NAME
++ *
++ *       zynqmp_r5.c
++ *
++ * DESCRIPTION
++ *
++ *       This file is the Implementation of IPC hardware layer interface
++ *       for the Xilinx zcu102 platform.
++ *
++ **************************************************************************/
++
++#include <vxWorks.h>
++#include "metal/atomic.h" 
++#include "metal/irq.h"
++#include "metal/sys.h"
++#include "openamp/hil.h"
++#include "openamp/elf_loader.h"
++#include "openamp/open_amp_vx.h"
++
++char * openampRole = "remote";
++
++#define _rproc_wait() taskDelay(0)
++
++
++/*--------------------------- Declare Functions ------------------------ */
++static int _enable_interrupt(struct proc_vring *vring_hw);
++static void _notify(struct hil_proc *proc, struct proc_intr *intr_info);
++static int _boot_cpu(struct hil_proc *proc, unsigned int load_addr);
++static void _shutdown_cpu(struct hil_proc *proc);
++static int _poll(struct hil_proc *proc, int nonblock);
++static int _initialize(struct hil_proc *proc);
++static void _release(struct hil_proc *proc);
++
++static int platform_isr(int vect_id, void *data);
++
++
++/*--------------------------- Globals ---------------------------------- */
++struct hil_platform_ops zynqmp_r5_proc_ops = {
++    .enable_interrupt   = _enable_interrupt,
++    .notify             = _notify,
++    .boot_cpu           = _boot_cpu,
++    .shutdown_cpu       = _shutdown_cpu,
++    .poll               = _poll,
++    .initialize         = _initialize,
++    .release            = _release,
++};
++
++static int _enable_interrupt(struct proc_vring *vring_hw)
++{
++    OPEN_AMP_DBG(3, "vring_hw=%p\n", vring_hw);
++    /* Register ISR*/    
++    metal_irq_register(vring_hw->intr_info.vect_id, platform_isr,
++                    vring_hw->intr_info.dev, vring_hw);
++
++    /* Enable the interrupts */
++    metal_irq_enable(vring_hw->intr_info.vect_id);
++
++    return 0;
++}
++
++static void _notify(struct hil_proc *proc, struct proc_intr *intr_info) 
++{
++    OPEN_AMP_DBG(3, "cpu_id=%d,intr_info=%p\n", proc->cpu_id, intr_info);
++    if (vx_openamp_ipi_notify)
++        vx_openamp_ipi_notify(intr_info->vect_id);
++}
++
++static int _boot_cpu(struct hil_proc *proc, unsigned int load_addr)
++{
++    OPEN_AMP_DBG(3, "cpu_id=%d,load_addr=%d\n", proc->cpu_id, load_addr);
++    return 0;
++}
++
++static void _shutdown_cpu(struct hil_proc *proc)
++{
++    OPEN_AMP_DBG(3, "cpu_id=%d\n", proc->cpu_id);
++}
++
++static int platform_isr(int vect_id, void *data)
++{
++    struct proc_vring *vring_hw = (struct proc_vring *)(data);
++    struct proc_intr *intr_info;
++
++    (void) vect_id;
++    
++    intr_info = &(vring_hw->intr_info);
++
++    atomic_flag_clear((atomic_uint *)&(intr_info->data));
++
++    OPEN_AMP_DBG(3, "vector=%d,data=%p\n", vect_id, data);
++
++    return 0;
++}
++
++static int _poll(struct hil_proc *proc, int nonblock)
++{
++    struct proc_vring *vring;
++    struct proc_intr *intr_info;
++    int i = 0;
++
++    int kicked = 0;
++    while(1) {
++        vring = &proc->vdev.vring_info[i];
++        intr_info = &(vring->intr_info);
++#if 0
++         kprintf("poll vring[%d]=%p vring[%d]->vq=%p %p=0x%x\n", i,  vring, i, vring->vq, &(intr_info->data), intr_info->data);
++#endif
++
++        if (!(atomic_flag_test_and_set(
++            (atomic_uint *)&(intr_info->data)))) {
++#if 0
++         kprintf(">>poll vring[%d]=%p %p=0x%x\n",i,  vring, &(intr_info->data), intr_info->data);
++             kprintf("calling virtqueue_notification(vring->vq=%p)\n", vring->vq);
++#endif
++
++            virtqueue_notification(vring->vq);
++            kicked = 1;
++
++            if (i)
++                return 0;
++            i++;
++        } else if (!i) {
++            i++;
++        } else {
++            if (kicked) {
++                return 0;
++            } else if (nonblock) {
++                return -EAGAIN;
++            } else {
++                _rproc_wait();
++                i--;
++                continue;
++            }
++        }
++    }
++}
++
++static int _initialize(struct hil_proc *proc)
++{
++    int i;
++    struct proc_intr *intr_info;
++
++    for (i = 0; i < 2; i++) {
++        intr_info = &(proc->vdev.vring_info[i].intr_info);
++        atomic_store((atomic_uint *)&(intr_info->data), 1);
++    }
++
++    return 0;    
++}
++
++static void _release(struct hil_proc *proc)
++{
++    (void)proc;
++    return;
++}
++
++int metal_machine_load_remote(void *src, void *destination,
++				    Elf32_Off offset, Elf32_Word size)
++{
++    /* nothing to do on slave */
++    return 0;
++}
++
++
++void * metal_machine_io_mem_map(unsigned int pa, unsigned int size, 
++                                          unsigned int flags)
++{
++	
++    return (void *)pa;
++}
++
+diff -uparN open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_r5_info.c openamp/lib/remoteproc/drivers/zynqmp/zynqmp_r5_info.c
+--- open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_r5_info.c	1969-12-31 19:00:00.000000000 -0500
++++ openamp/lib/remoteproc/drivers/zynqmp/zynqmp_r5_info.c	2019-06-22 21:35:13.099001000 -0400
+@@ -0,0 +1,122 @@
++/*
++ * Copyright (c) 2014, Mentor Graphics Corporation
++ * All rights reserved.
++ * Copyright (c) 2016, 2019 Wind River Systems, Inc. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ * 3. Neither the name of Mentor Graphics Corporation nor the names of its
++ *    contributors may be used to endorse or promote products derived from this
++ *    software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
++
++/**************************************************************************
++ * FILE NAME
++ *
++ *       zynqmp_r5_info.c
++ *
++ * DESCRIPTION
++ *
++ *       This file implements APIs to get platform specific
++ *       information for OpenAMP. 
++ *
++ **************************************************************************/
++
++#include "openamp/hil.h"
++#include "metal/sys.h"
++#include "metal/shmem.h"
++#include "metal/device.h"
++#include "metal/io.h"
++
++/* Reference implementation that show cases platform_get_cpu_info and 
++ platform_get_for_firmware API implementation for Bare metal environment */
++
++extern struct hil_platform_ops zynqmp_r5_proc_ops;
++
++#define SHM_ADDR     (void *)(0x77f00000)
++#define SHM_SIZE     (0x20000 - 0x8000)
++
++#define VRING0_IPI_VECT                   0
++#define VRING1_IPI_VECT                   1
++#define VRING2_IPI_VECT                   2
++#define VRING3_IPI_VECT                   3
++#define MASTER_CPU_ID                     0
++#define REMOTE_CPU_ID                     1
++#define RPMSG_CHAN_NAME                   "rpmsg-openamp-demo-channel"
++
++const metal_phys_addr_t metal_xlnx_zynqmp_phys[] = {
++    0x77f00000, 
++};
++
++#define VRING_DEV_NAME         "77f00000.vring"
++
++struct metal_generic_shmem metal_shm_table[] = {
++    {
++        /* vring device */
++        VRING_DEV_NAME,
++        {
++	    (void *)0x77f00000,
++            &metal_xlnx_zynqmp_phys[0],    /* from RING_TX and RING_RX in rsc_table.c */
++            0x8000,
++            (sizeof(metal_phys_addr_t) << 3),
++            (unsigned long)(-1),
++            METAL_UNCACHED | METAL_SHARED_MEM,
++            {NULL},
++        },
++        {NULL},
++    },
++};
++
++const int metal_shm_table_size = sizeof(metal_shm_table)/sizeof(struct metal_generic_shmem);
++
++struct firmware_info fw_table[] =
++{
++    {"",
++     0,
++     0}
++};
++
++const int fw_table_size = sizeof(fw_table)/sizeof(struct firmware_info);
++
++struct hil_proc *platform_create_proc(int proc_index)
++{
++    struct hil_proc *proc;
++
++    (void)proc_index;
++    proc = hil_create_proc(&zynqmp_r5_proc_ops, MASTER_CPU_ID, NULL);
++    if (!proc)
++    	return NULL;
++
++    /* Setup IPI info */
++    hil_set_ipi(proc, 0, VRING0_IPI_VECT, NULL);
++    hil_set_ipi(proc, 1, VRING1_IPI_VECT, NULL);
++#if 0
++    hil_set_vring(proc, 0, NULL, VRING_DEV_NAME);
++    hil_set_vring(proc, 1, NULL, VRING_DEV_NAME);
++#endif
++
++    /* Setup RPMSG channel info */
++    hil_set_rpmsg_channel(proc, 0, RPMSG_CHAN_NAME);
++
++    return proc;
++}
++
++
+diff -uparN open-amp-2016.10/lib/remoteproc/Makefile openamp/lib/remoteproc/Makefile
+--- open-amp-2016.10/lib/remoteproc/Makefile	2019-06-22 21:35:13.051001000 -0400
++++ openamp/lib/remoteproc/Makefile	2019-06-22 21:35:13.099001000 -0400
+@@ -1,6 +1,6 @@
+ # Makefile - makefile for OpenAMP remoteproc
+ #
+-# Copyright (c) 2016 Wind River Systems, Inc. 
++# Copyright (c) 2016, 2019 Wind River Systems, Inc. 
+ # 
+ # Redistribution and use in source and binary forms, with or without modification, are 
+ # permitted provided that the following conditions are met: 
+@@ -29,6 +29,7 @@
+ #
+ # modification history
+ # --------------------
++# 14drp19,drp  Added support for Xilinx zcu102
+ # 10nov16,ghl  Create for OpenAMP on vxworks-7 (F8373).
+ #
+ # DESCRIPTION
+@@ -41,8 +42,21 @@ include $(WIND_KRNL_MK)/defs.library.mk
+ 
+ SUBDIRS = drivers
+ 
++ifdef   _WRS_CONFIG_FSL_IMX
+ OBJS_ARMARCH7M = remoteproc.o rsc_table_parser.o remoteproc_loader.o elf_loader.o
+ OBJS_ARMARCH7  = remoteproc.o rsc_table_parser.o remoteproc_loader.o elf_loader.o
++endif
++
++ifdef   _WRS_CONFIG_TI_SITARA
++OBJS_ARMARCH7M = remoteproc.o rsc_table_parser.o remoteproc_loader.o elf_loader.o
++OBJS_ARMARCH7  = remoteproc.o rsc_table_parser.o remoteproc_loader.o elf_loader.o
++endif
++
++ifdef   _WRS_CONFIG_XLNX_ZYNQ
++OBJS_ARMARCH7 = remoteproc.o rsc_table_parser.o remoteproc_loader.o elf_loader.o
++OBJS_ARMARCH8A  = remoteproc.o rsc_table_parser.o remoteproc_loader.o elf_loader.o
++endif
++
+ DOC_FILES      = remoteproc.c rsc_table_parser.c remoteproc_loader.c elf_loader.c
+ 
+ OBJS=$(OBJS_$(CPU))
+diff -uparN open-amp-2016.10/lib/rpmsg/Makefile openamp/lib/rpmsg/Makefile
+--- open-amp-2016.10/lib/rpmsg/Makefile	2019-06-22 21:35:13.051001000 -0400
++++ openamp/lib/rpmsg/Makefile	2019-06-22 21:35:13.099001000 -0400
+@@ -29,6 +29,7 @@
+ #
+ # modification history
+ # --------------------
++# 30mar19,drp  Added support for Xilinx zcu102
+ # 10nov16,ghl  Create for OpenAMP on vxworks-7 (F8373).
+ #
+ # DESCRIPTION
+@@ -39,8 +40,22 @@ LIB_BASE_NAME = OPENAMP
+ 
+ include $(WIND_KRNL_MK)/defs.library.mk
+ 
++
++ifdef   _WRS_CONFIG_FSL_IMX
++OBJS_ARMARCH7M = rpmsg.o rpmsg_core.o remote_device.o
++OBJS_ARMARCH7  = rpmsg.o rpmsg_core.o remote_device.o
++endif
++
++ifdef   _WRS_CONFIG_TI_SITARA
+ OBJS_ARMARCH7M = rpmsg.o rpmsg_core.o remote_device.o
+ OBJS_ARMARCH7  = rpmsg.o rpmsg_core.o remote_device.o
++endif
++
++ifdef   _WRS_CONFIG_XLNX_ZYNQ
++OBJS_ARMARCH7 = rpmsg.o rpmsg_core.o remote_device.o
++OBJS_ARMARCH8A  = rpmsg.o rpmsg_core.o remote_device.o
++endif
++
+ DOC_FILES      = rpmsg.c rpmsg_core.c remote_device.c
+ 
+ include $(wildcard $(sort *.mk))
+diff -uparN open-amp-2016.10/lib/virtio/Makefile openamp/lib/virtio/Makefile
+--- open-amp-2016.10/lib/virtio/Makefile	2019-06-22 21:35:13.051001000 -0400
++++ openamp/lib/virtio/Makefile	2019-06-22 21:35:13.099001000 -0400
+@@ -29,6 +29,7 @@
+ #
+ # modification history
+ # --------------------
++# 14juna4,drp  Added support for Xilinx zcu102
+ # 10nov16,ghl  Create for OpenAMP on vxworks-7 (F8373).
+ #
+ # DESCRIPTION
+@@ -39,8 +40,22 @@ LIB_BASE_NAME = OPENAMP
+ 
+ include $(WIND_KRNL_MK)/defs.library.mk
+ 
++ifdef   _WRS_CONFIG_FSL_IMX
+ OBJS_ARMARCH7M = virtio.o virtqueue.o
+ OBJS_ARMARCH7  = virtio.o virtqueue.o
++endif
++
++ifdef   _WRS_CONFIG_TI_SITARA
++OBJS_ARMARCH7M = virtio.o virtqueue.o
++OBJS_ARMARCH7  = virtio.o virtqueue.o
++endif
++
++ifdef   _WRS_CONFIG_XLNX_ZYNQ
++OBJS_ARMARCH7 = virtio.o virtqueue.o
++OBJS_ARMARCH8A  = virtio.o virtqueue.o
++endif
++
++
+ DOC_FILES      = virtio.c virtqueue.c
+ 
+ 

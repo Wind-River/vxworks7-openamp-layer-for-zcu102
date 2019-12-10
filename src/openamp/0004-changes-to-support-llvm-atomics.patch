@@ -1,0 +1,127 @@
+diff -uparN open-amp-2016.10/lib/include/openamp/rpmsg_retarget.h openamp/lib/include/openamp/rpmsg_retarget.h
+--- open-amp-2016.10/lib/include/openamp/rpmsg_retarget.h	2016-11-04 12:18:46.000000000 -0400
++++ openamp/lib/include/openamp/rpmsg_retarget.h	2019-07-26 18:01:00.802139842 -0400
+@@ -24,7 +24,11 @@ struct _rpc_data {
+ 	struct rpmsg_channel *rpmsg_chnl;
+ 	struct rpmsg_endpoint *rp_ept;
+ 	metal_mutex_t rpc_lock;
++#if 0
+ 	atomic_int sync;
++#else
++	atomic_flag sync;
++#endif
+ 	struct _sys_rpc *rpc;
+ 	struct _sys_rpc *rpc_response;
+ 	rpc_shutdown_cb shutdown_cb;
+diff -uparN open-amp-2016.10/lib/proxy/rpmsg_retarget.c openamp/lib/proxy/rpmsg_retarget.c
+--- open-amp-2016.10/lib/proxy/rpmsg_retarget.c	2016-11-04 12:18:46.000000000 -0400
++++ openamp/lib/proxy/rpmsg_retarget.c	2019-07-26 18:01:00.802139842 -0400
+@@ -20,9 +20,13 @@ void rpc_cb(struct rpmsg_channel *rtl_rp
+ 	(void)priv;
+ 	(void)src;
+ 
+-	memcpy(rpc_data->rpc_response, data, len);
+ 
++	memcpy(rpc_data->rpc_response, data, len);
++#if 0
++	atomic_flag_clear(&rpc_data->sync);
++#else
+ 	atomic_flag_clear(&rpc_data->sync);
++#endif
+ 	if (rpc_data->rpc_response->id == TERM_SYSCALL_ID) {
+ 		/* Application terminate signal is received from the proxy app,
+ 		 * so let the application know of terminate message.
+@@ -48,7 +52,11 @@ int rpmsg_retarget_init(struct rpmsg_cha
+ 	metal_mutex_init(&rpc_data->rpc_lock);
+ 
+ 	/* Create a mutex for synchronization */
++#if 0
+ 	atomic_store(&rpc_data->sync, 1);
++#else
++	atomic_store(&(&rpc_data->sync)->_Value, 1);
++#endif 
+ 
+ 	/* Create a endpoint to handle rpc response from master */
+ 	rpc_data->rpmsg_chnl = rp_chnl;
+diff -uparN open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_a53.c openamp/lib/remoteproc/drivers/zynqmp/zynqmp_a53.c
+--- open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_a53.c	2019-07-26 18:01:00.758139842 -0400
++++ openamp/lib/remoteproc/drivers/zynqmp/zynqmp_a53.c	2019-07-26 18:01:00.806139842 -0400
+@@ -161,7 +161,11 @@ static int platform_isr(int vect_id, voi
+     (void) vect_id;
+     
+     intr_info = &(vring_hw->intr_info);
++#if 0
+     atomic_flag_clear((atomic_uint *)&(intr_info->data));
++#else
++    atomic_flag_clear((atomic_flag *)&(intr_info->data));
++#endif
+ 
+     OPEN_AMP_DBG(3, "vector=%d,data=%p\n", vect_id, data);
+ 
+@@ -179,7 +183,11 @@ static int _poll(struct hil_proc * proc,
+         vring = &proc->vdev.vring_info[i];
+         intr_info = &(vring->intr_info);
+         if (!(atomic_flag_test_and_set(
++#if 0
+             (atomic_uint *)&(intr_info->data)))) {
++#else
++            (atomic_flag *)&(intr_info->data)))) {
++#endif
+ #if 0
+          kprintf(">>poll vring[%d]=%p %p=0x%x\n",i,  vring, &(intr_info->data), intr_info->data); 
+              kprintf("calling virtqueue_notification(vring->vq=%p)\n", vring->vq);
+@@ -212,7 +220,11 @@ static int _initialize(struct hil_proc *
+ 
+     for (i = 0; i < 2; i++) {
+         intr_info = &(proc->vdev.vring_info[i].intr_info);
++#if 0
+         atomic_store((atomic_uint *)&(intr_info->data), 1);
++#else
++    	atomic_store(&((atomic_flag *)&(intr_info->data))->_Value, 1);
++#endif
+     }
+ 
+     return 0;    
+diff -uparN open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_r5.c openamp/lib/remoteproc/drivers/zynqmp/zynqmp_r5.c
+--- open-amp-2016.10/lib/remoteproc/drivers/zynqmp/zynqmp_r5.c	2019-07-26 18:01:00.758139842 -0400
++++ openamp/lib/remoteproc/drivers/zynqmp/zynqmp_r5.c	2019-07-26 18:01:00.806139842 -0400
+@@ -115,8 +115,12 @@ static int platform_isr(int vect_id, voi
+     (void) vect_id;
+     
+     intr_info = &(vring_hw->intr_info);
+-
++#if 0
+     atomic_flag_clear((atomic_uint *)&(intr_info->data));
++#else
++    atomic_flag_clear((atomic_flag *)&(intr_info->data));
++#endif
++
+ 
+     OPEN_AMP_DBG(3, "vector=%d,data=%p\n", vect_id, data);
+ 
+@@ -137,8 +141,13 @@ static int _poll(struct hil_proc *proc,
+          kprintf("poll vring[%d]=%p vring[%d]->vq=%p %p=0x%x\n", i,  vring, i, vring->vq, &(intr_info->data), intr_info->data);
+ #endif
+ 
++
+         if (!(atomic_flag_test_and_set(
++#if 0
+             (atomic_uint *)&(intr_info->data)))) {
++#else
++            (atomic_flag *)&(intr_info->data)))) {
++#endif
+ #if 0
+          kprintf(">>poll vring[%d]=%p %p=0x%x\n",i,  vring, &(intr_info->data), intr_info->data);
+              kprintf("calling virtqueue_notification(vring->vq=%p)\n", vring->vq);
+@@ -173,7 +182,11 @@ static int _initialize(struct hil_proc *
+ 
+     for (i = 0; i < 2; i++) {
+         intr_info = &(proc->vdev.vring_info[i].intr_info);
++#if 0
+         atomic_store((atomic_uint *)&(intr_info->data), 1);
++#else
++    	atomic_store(&((atomic_flag *)&(intr_info->data))->_Value, 1);
++#endif
+     }
+ 
+     return 0;    
